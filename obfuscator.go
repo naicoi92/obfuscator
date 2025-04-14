@@ -41,7 +41,7 @@ func NewObfuscator() (*Obfuscator, error) {
 	context := v8go.NewContext(isolate)
 	defer context.Close()
 	o := &Obfuscator{}
-	if err := o.setupJSCode(isolate, context, nil); err != nil {
+	if err := o.setupJSCode(isolate, context); err != nil {
 		return nil, fmt.Errorf("failed to setup JS code: %w", err)
 	}
 	return o, nil
@@ -53,7 +53,6 @@ func NewObfuscator() (*Obfuscator, error) {
 func (o *Obfuscator) setupJSCode(
 	isolate *v8go.Isolate,
 	context *v8go.Context,
-	cache *v8go.CompilerCachedData,
 ) error {
 	code := fmt.Sprintf(`
   (function() {
@@ -67,8 +66,8 @@ func (o *Obfuscator) setupJSCode(
 	})()
   `, JsCode)
 	opts := v8go.CompileOptions{}
-	if cache != nil {
-		opts.CachedData = cache
+	if o.CachedData != nil {
+		opts.CachedData = o.CachedData
 	}
 	script, err := isolate.CompileUnboundScript(code, "obfuscation.js", opts)
 	if err != nil {
@@ -77,7 +76,7 @@ func (o *Obfuscator) setupJSCode(
 	if _, err := script.Run(context); err != nil {
 		return fmt.Errorf("failed to run script: %w", err)
 	}
-	if cache == nil {
+	if o.CachedData == nil {
 		o.CachedData = script.CreateCodeCache()
 	}
 	return nil
@@ -93,7 +92,7 @@ func (o *Obfuscator) Obfuscate(code string) (string, error) {
 	defer isolate.Dispose()
 	context := v8go.NewContext(isolate)
 	defer context.Close()
-	if err := o.setupJSCode(isolate, context, o.CachedData); err != nil {
+	if err := o.setupJSCode(isolate, context); err != nil {
 		return "", fmt.Errorf("failed to setup JS code: %w", err)
 	}
 	codeString := fmt.Sprintf(
