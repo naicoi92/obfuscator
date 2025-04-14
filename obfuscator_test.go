@@ -38,7 +38,7 @@ func TestNewObfuscator_MultipleObfuscations(t *testing.T) {
 
 	// Act & Assert
 	// Thực hiện obfuscate nhiều lần
-	for i := 0; i < 3; i++ {
+	for i := 0; i < 10; i++ {
 		result, err := obf.Obfuscate(jsCode)
 		assert.NoError(t, err, "Obfuscation #%d không nên có lỗi", i+1)
 		assert.NotEmpty(t, result, "Kết quả obfuscation #%d không nên rỗng", i+1)
