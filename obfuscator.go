@@ -31,74 +31,30 @@ const options = {
 
 // Obfuscator represents a JavaScript obfuscator instance
 type Obfuscator struct {
-	Isolate *v8go.Isolate
-	Context *v8go.Context
+	CachedData *v8go.CompilerCachedData
 }
 
 // NewObfuscator creates and initializes a new JavaScript obfuscator
 func NewObfuscator() (*Obfuscator, error) {
 	isolate := v8go.NewIsolate()
+	defer isolate.Dispose()
 	context := v8go.NewContext(isolate)
-
-	o := &Obfuscator{
-		Isolate: isolate,
-		Context: context,
+	defer context.Close()
+	o := &Obfuscator{}
+	if err := o.setupJSCode(isolate, context, nil); err != nil {
+		return nil, fmt.Errorf("failed to setup JS code: %w", err)
 	}
-
-	if err := o.init(); err != nil {
-		o.Close() // Clean up resources on initialization error
-		return nil, fmt.Errorf("failed to initialize obfuscator: %w", err)
-	}
-
 	return o, nil
 }
 
 // Close releases all resources used by the obfuscator
-func (o *Obfuscator) Close() {
-	if o.Context != nil {
-		o.Context.Close()
-	}
-	if o.Isolate != nil {
-		o.Isolate.Dispose()
-	}
-}
-
-// init initializes the JavaScript environment for obfuscation
-func (o *Obfuscator) init() error {
-	steps := []struct {
-		name string
-		fn   func() error
-	}{
-		{"setup JavaScript code", o.setupJSCode},
-		{"verify JavaScript Obfuscator", o.checkJSCode},
-		{"set up obfuscation options", o.setupOptions},
-	}
-
-	for _, step := range steps {
-		if err := step.fn(); err != nil {
-			return fmt.Errorf("%s: %w", step.name, err)
-		}
-	}
-
-	return nil
-}
-
-// checkJSCode verifies that the JavaScriptObfuscator global is available
-func (o *Obfuscator) checkJSCode() error {
-	val, err := o.Context.RunScript("typeof JavaScriptObfuscator", "check.js")
-	if err != nil {
-		return err
-	}
-
-	if val.String() != "function" {
-		return fmt.Errorf("JavaScriptObfuscator is not defined")
-	}
-
-	return nil
-}
 
 // setupJSCode loads the JavaScript obfuscator code into the V8 context
-func (o *Obfuscator) setupJSCode() error {
+func (o *Obfuscator) setupJSCode(
+	isolate *v8go.Isolate,
+	context *v8go.Context,
+	cache *v8go.CompilerCachedData,
+) error {
 	code := fmt.Sprintf(`
   (function() {
     var self = this;
@@ -110,15 +66,21 @@ func (o *Obfuscator) setupJSCode() error {
     globalThis.JavaScriptObfuscator = module.exports;
 	})()
   `, JsCode)
-
-	_, err := o.Context.RunScript(code, "obfuscation.js")
-	return err
-}
-
-// setupOptions initializes the default obfuscation options
-func (o *Obfuscator) setupOptions() error {
-	_, err := o.Context.RunScript(defaultOptions, "options.js")
-	return err
+	opts := v8go.CompileOptions{}
+	if cache != nil {
+		opts.CachedData = cache
+	}
+	script, err := isolate.CompileUnboundScript(code, "obfuscation.js", opts)
+	if err != nil {
+		return fmt.Errorf("failed to compile script: %w", err)
+	}
+	if _, err := script.Run(context); err != nil {
+		return fmt.Errorf("failed to run script: %w", err)
+	}
+	if cache == nil {
+		o.CachedData = script.CreateCodeCache()
+	}
+	return nil
 }
 
 // Obfuscate transforms the provided JavaScript code using the obfuscator
@@ -127,24 +89,25 @@ func (o *Obfuscator) Obfuscate(code string) (string, error) {
 	if strings.Contains(code, "`") {
 		return "", fmt.Errorf("code cannot contain backtick (`) ")
 	}
-
-	ctx := v8go.NewContext(o.Isolate)
-	defer ctx.Close()
-
+	isolate := v8go.NewIsolate()
+	defer isolate.Dispose()
+	context := v8go.NewContext(isolate)
+	defer context.Close()
+	if err := o.setupJSCode(isolate, context, o.CachedData); err != nil {
+		return "", fmt.Errorf("failed to setup JS code: %w", err)
+	}
 	codeString := fmt.Sprintf(
-		"const code = `%s`;const obfuscatedCode = JavaScriptObfuscator.obfuscate(code, options).getObfuscatedCode();obfuscatedCode;",
+		"const code = `%s`; %s ;const obfuscatedCode = JavaScriptObfuscator.obfuscate(code, options).getObfuscatedCode();obfuscatedCode;",
 		code,
+		defaultOptions,
 	)
-
-	val, err := ctx.RunScript(codeString, "obfuscate.js")
+	val, err := context.RunScript(codeString, "run.js")
 	if err != nil {
 		return "", fmt.Errorf("obfuscation error: %w", err)
 	}
-
 	obfuscatedCode := val.String()
 	if obfuscatedCode == "" {
 		return "", fmt.Errorf("obfuscated code is empty")
 	}
-
 	return obfuscatedCode, nil
 }
