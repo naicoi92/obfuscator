@@ -19,7 +19,7 @@ func NewObfuscator() (*Obfuscator, error) {
 	o := &Obfuscator{}
 	o.Isolate = v8go.NewIsolate()
 	o.Context = v8go.NewContext(o.Isolate)
-	if err := o.Init(); err != nil {
+	if err := o.init(); err != nil {
 		return nil, err
 	}
 	return o, nil
@@ -30,20 +30,20 @@ func (o *Obfuscator) Close() {
 	o.Context.Close()
 }
 
-func (o *Obfuscator) Init() error {
-	if err := o.SetupJSCode(); err != nil {
+func (o *Obfuscator) init() error {
+	if err := o.setupJSCode(); err != nil {
 		return err
 	}
-	if err := o.CheckJSCode(); err != nil {
+	if err := o.checkJSCode(); err != nil {
 		return err
 	}
-	if err := o.SetupOptions(); err != nil {
+	if err := o.setupOptions(); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (o *Obfuscator) CheckJSCode() error {
+func (o *Obfuscator) checkJSCode() error {
 	val, err := o.Context.RunScript("typeof JavaScriptObfuscator", "check.js")
 	if err != nil {
 		return err
@@ -54,7 +54,7 @@ func (o *Obfuscator) CheckJSCode() error {
 	return nil
 }
 
-func (o *Obfuscator) SetupJSCode() error {
+func (o *Obfuscator) setupJSCode() error {
 	code := fmt.Sprintf(`
   (function() {
     var self = this;
@@ -72,7 +72,7 @@ func (o *Obfuscator) SetupJSCode() error {
 	return nil
 }
 
-func (o *Obfuscator) SetupOptions() error {
+func (o *Obfuscator) setupOptions() error {
 	code := `
   const options = {
       compact: (Math.random() < 0.5),
