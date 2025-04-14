@@ -128,12 +128,15 @@ func (o *Obfuscator) Obfuscate(code string) (string, error) {
 		return "", fmt.Errorf("code cannot contain backtick (`) ")
 	}
 
+	ctx := v8go.NewContext(o.Isolate)
+	defer ctx.Close()
+
 	codeString := fmt.Sprintf(
 		"const code = `%s`;const obfuscatedCode = JavaScriptObfuscator.obfuscate(code, options).getObfuscatedCode();obfuscatedCode;",
 		code,
 	)
 
-	val, err := o.Context.RunScript(codeString, "obfuscate.js")
+	val, err := ctx.RunScript(codeString, "obfuscate.js")
 	if err != nil {
 		return "", fmt.Errorf("obfuscation error: %w", err)
 	}
