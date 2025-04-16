@@ -1,4 +1,4 @@
-# jsobfuscator-go
+# obfuscator
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/naicoi92/obfuscator)](https://goreportcard.com/report/github.com/naicoi92/obfuscator)
 [![GoDoc](https://godoc.org/github.com/naicoi92/obfuscator?status.svg)](https://godoc.org/github.com/naicoi92/obfuscator)
