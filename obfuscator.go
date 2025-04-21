@@ -71,8 +71,8 @@ func (o *Obfuscator) setupJSCode(
 	return nil
 }
 
-func (o *Obfuscator) SetLevel(level ObfuscationLevel) {
-	o.Level = level
+func (o *Obfuscator) SetLevel(level string) {
+	o.Level = ObfuscationLevel(level)
 }
 
 // Obfuscate transforms the provided JavaScript code using the obfuscator
