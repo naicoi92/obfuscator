@@ -15,23 +15,10 @@ import (
 //go:embed obfuscation.js
 var JsCode string
 
-// Default options for JavaScript obfuscation
-const defaultOptions = `
-const options = {
-    compact: (Math.random() < 0.5),
-    controlFlowFlattening: true,
-    controlFlowFlatteningThreshold: 1,
-    numbersToExpressions: true,
-    simplify: true,
-    stringArrayShuffle: true,
-    splitStrings: true,
-    stringArrayThreshold: 1
-}
-`
-
 // Obfuscator represents a JavaScript obfuscator instance
 type Obfuscator struct {
 	CachedData *v8go.CompilerCachedData
+	Level      ObfuscationLevel
 }
 
 // NewObfuscator creates and initializes a new JavaScript obfuscator
@@ -40,7 +27,9 @@ func NewObfuscator() (*Obfuscator, error) {
 	defer isolate.Dispose()
 	context := v8go.NewContext(isolate)
 	defer context.Close()
-	o := &Obfuscator{}
+	o := &Obfuscator{
+		Level: DefaultLevel,
+	}
 	if err := o.setupJSCode(isolate, context); err != nil {
 		return nil, fmt.Errorf("failed to setup JS code: %w", err)
 	}
@@ -82,6 +71,10 @@ func (o *Obfuscator) setupJSCode(
 	return nil
 }
 
+func (o *Obfuscator) SetLevel(level string) {
+	o.Level = ObfuscationLevel(level)
+}
+
 // Obfuscate transforms the provided JavaScript code using the obfuscator
 func (o *Obfuscator) Obfuscate(code string) (string, error) {
 	// Escape backticks in the input code to prevent JavaScript template literal issues
@@ -95,10 +88,11 @@ func (o *Obfuscator) Obfuscate(code string) (string, error) {
 	if err := o.setupJSCode(isolate, context); err != nil {
 		return "", fmt.Errorf("failed to setup JS code: %w", err)
 	}
+	options := getOptions(o.Level)
 	codeString := fmt.Sprintf(
 		"const code = `%s`; %s ;const obfuscatedCode = JavaScriptObfuscator.obfuscate(code, options).getObfuscatedCode();obfuscatedCode;",
 		code,
-		defaultOptions,
+		options,
 	)
 	val, err := context.RunScript(codeString, "run.js")
 	if err != nil {

@@ -1,4 +1,4 @@
-module github.com/naicoi92/obfuscator
+module gitlab.com/naicoi92/obfuscator
 
 go 1.24.0
 
